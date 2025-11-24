@@ -17,7 +17,7 @@ except FileNotFoundError:
     st.warning("File style.css tidak ditemukan di folder assets.")
 
 def main(): 
-    st.markdown('<div class="main-title">Mutlimodal Hoax Detector</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">Deteksi Kevalidan Berita Politik</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">Sistem Deteksi Multimedia (Gambar, Teks, & Audio)</div>', unsafe_allow_html=True)
 
     tab1, tab2, tab3, tab4, tab_multi = st.tabs(["Beranda", "Cek Judul", "Cek Gambar", "Cek Audio", "Multimodal",])
