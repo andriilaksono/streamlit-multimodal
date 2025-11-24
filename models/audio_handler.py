@@ -1,79 +1,71 @@
 import torch
 import os
 import numpy as np
-import librosa # <--- Kita pakai ini, jauh lebih stabil daripada Torchaudio di Windows
+import librosa
+import traceback # <-- Tambahan penting buat melacak error
 from transformers import Wav2Vec2ForSequenceClassification
 
 class AudioHandler:
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model_path = os.path.join("assets", "audio_models", "wav2vec2.pt")
+        self.model_name = "facebook/wav2vec2-base-960h"
         self.model = None
-        self.class_names = ["Real", "Fake/Generated"] 
-        
+        self.class_names = ["Real", "Fake"] 
         self.load_model()
 
     def load_model(self):
         if self.model is not None:
             return
 
-        print(f"Memuat model audio dari {self.model_path}...")
+        print(f"🔄 Sedang memuat model audio dari {self.model_name}...")
         try:
-            # 1. Bangun Arsitektur
-            try:
-                model_name = "facebook/wav2vec2-base"
-                self.model = Wav2Vec2ForSequenceClassification.from_pretrained(
-                    model_name, 
-                    num_labels=2
-                )
-            except Exception as e:
-                print(f"Gagal download config base: {e}")
-                return
-
-            # 2. Load Weights
-            if os.path.exists(self.model_path):
-                checkpoint = torch.load(self.model_path, map_location=self.device)
-                if isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
-                    checkpoint = checkpoint['state_dict']
-                
-                # Load state dict
-                self.model.load_state_dict(checkpoint, strict=False)
-            else:
-                print(f"⚠️ File {self.model_path} tidak ditemukan. Menggunakan model base kosong.")
-
+            self.model = Wav2Vec2ForSequenceClassification.from_pretrained(
+                self.model_name,
+                num_labels=2
+            )
             self.model.to(self.device)
             self.model.eval()
-            print("✅ Model Audio berhasil dimuat.")
+            print("✅ Model Audio Siap.")
             
         except Exception as e:
-            print(f"❌ Error Fatal saat load model audio: {e}")
+            print(f"❌ Gagal memuat model: {e}")
+            traceback.print_exc() # Cetak error lengkap ke terminal
+            self.model = None
 
     def preprocess_audio(self, audio_file):
-        # --- PERUBAHAN TOTAL DI SINI ---
-        # Kita pakai LIBROSA. 
-        # sr=16000 artinya otomatis diubah ke 16kHz (resample otomatis).
-        # mono=True artinya otomatis diubah jadi 1 channel.
-        speech_array, _ = librosa.load(audio_file, sr=16000, mono=True)
+        print(f"📂 Mencoba memproses file: {audio_file}")
+        
+        # 1. Load Audio pakai Librosa
+        # PENTING: Librosa butuh FFmpeg untuk MP3 di Windows
+        try:
+            speech_array, sr = librosa.load(audio_file, sr=16000, mono=True)
+            print(f"✅ Audio berhasil dibaca. Sample Rate: {sr}, Panjang: {len(speech_array)}")
+        except Exception as e:
+            print("❌ Gagal membaca file audio dengan Librosa.")
+            raise e # Lempar error biar ditangkap fungsi predict
 
-        # Librosa outputnya Numpy, kita ubah ke Tensor PyTorch
+        # 2. Ubah ke Tensor
         waveform = torch.tensor(speech_array).float()
 
-        # Squeeze/Unsqueeze logic
-        # Kita butuh input bersih (1 dimensi array panjang)
-        return waveform
+        # 3. Potong durasi maks 10 detik (biar RAM aman)
+        max_len = 16000 * 10
+        if waveform.shape[0] > max_len:
+            waveform = waveform[:max_len]
+
+        # 4. Pastikan dimensi benar [1, length]
+        if waveform.dim() == 1:
+            waveform = waveform.unsqueeze(0)
+            
+        return waveform.to(self.device)
 
     def predict(self, audio_file):
         if self.model is None:
             self.load_model()
             if self.model is None:
-                return "Error: Model Gagal Diload", 0.0
+                return "Error: Model Gagal Diload (Cek Internet)", 0.0
 
         try:
-            # Preprocess pakai Librosa
-            waveform = self.preprocess_audio(audio_file)
-            
-            # Wav2Vec2 butuh input [Batch, Length]. Kita tambah dimensi batch di depan.
-            input_tensor = waveform.unsqueeze(0).to(self.device)
+            input_tensor = self.preprocess_audio(audio_file)
 
             with torch.no_grad():
                 outputs = self.model(input_tensor)
@@ -90,5 +82,8 @@ class AudioHandler:
             return label, score
 
         except Exception as e:
-            print(f"Error saat prediksi audio: {e}")
+            # INI BAGIAN PENTING:
+            print("\n!!! ERROR TERJADI SAAT PREDIKSI !!!")
+            print(f"Pesan: {str(e)}")
+            traceback.print_exc() # Cetak detail error ke terminal
             return f"Error Proses: {str(e)}", 0.0
