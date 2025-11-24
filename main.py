@@ -17,10 +17,10 @@ except FileNotFoundError:
     st.warning("File style.css tidak ditemukan di folder assets.")
 
 def main(): 
-    st.markdown('<div class="main-title">🛡️ AI Hoax Detector</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">AI Hoax Detector</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">Sistem Deteksi Multimedia (Gambar, Teks, & Audio)</div>', unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4, tab_multi = st.tabs(["🏠 Beranda", "📝 Cek Judul", "🖼️ Cek Gambar", "🎙️ Cek Audio", "📚 Multimodal",])
+    tab1, tab2, tab3, tab4, tab_multi = st.tabs(["Beranda", "Cek Judul", "Cek Gambar", "Cek Audio", "Multimodal",])
 
     with tab_multi:
         st.markdown("---")
@@ -39,10 +39,10 @@ def main():
             st.markdown("""
             ### Selamat Datang!
             Aplikasi ini mendeteksi manipulasi informasi pada:
-            * **🖼️ Gambar:** Deteksi edit/manipulasi visual.
-            * **📝 Teks:** Analisis judul berita clickbait/palsu.
-            * **🎙️ Audio:** Deteksi suara Deepfake/AI Generated.
-            * **📚 Multimodal:** Analisis gabungan semua bukti untuk kesimpulan komprehensif.
+            * **Gambar:** Deteksi edit/manipulasi visual.
+            * **Teks:** Analisis judul berita clickbait/palsu.
+            * **Audio:** Deteksi suara Deepfake/AI Generated.
+            * **Multimodal:** Analisis gabungan semua bukti untuk kesimpulan komprehensif.
             """)
         st.info("💡 **Tips:** Pastikan koneksi internet stabil saat pertama kali menjalankan aplikasi.")
 
@@ -69,8 +69,6 @@ def main():
             st.warning("Modul audio belum tersedia.")
         except Exception as e:
             st.error(f"Error Modul Audio: {e}")
-
-    st.markdown('<div class="custom-footer">Dibuat dengan ❤️ menggunakan PyTorch & Streamlit</div>', unsafe_allow_html=True)
 
 if __name__ == '__main__':
     main()
