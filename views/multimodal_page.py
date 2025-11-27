@@ -3,7 +3,6 @@ import os
 from models.image_handler import ImageHandler
 from models.text_handler import TextHandler
 
-# Import Audio dengan aman (biar tidak error jika file audio_handler bermasalah)
 try:
     from models.audio_handler import AudioHandler
 except ImportError:
@@ -11,8 +10,6 @@ except ImportError:
 
 @st.cache_resource
 def load_handlers():
-    # Load semua model sekaligus di awal
-    # Pastikan AudioHandler ada sebelum dipanggil
     img_h = ImageHandler()
     txt_h = TextHandler()
     aud_h = AudioHandler() if AudioHandler else None
@@ -22,14 +19,12 @@ def show():
     st.subheader("Analisis Investigasi Lengkap (All-in-One)")
     st.caption("Kombinasikan teks, gambar, dan audio untuk analisis komprehensif.")
 
-    # Load Model
     try:
         img_handler, txt_handler, aud_handler = load_handlers()
     except Exception as e:
         st.error(f"Gagal memuat model: {e}")
         return
 
-    # --- INPUT SECTION (3 Kolom) ---
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -44,12 +39,10 @@ def show():
         st.info("3. Bukti Audio")
         input_audio = st.file_uploader("Upload Audio", type=["wav", "mp3"])
 
-    # --- TOMBOL EKSEKUSI ---
     st.markdown("---")
     analyze_btn = st.button("ANALISIS SEMUA BUKTI", type="primary", use_container_width=True)
 
     if analyze_btn:
-        # Cek apakah user sudah memasukkan minimal satu bukti
         if not input_text and not input_image and not input_audio:
             st.warning("Masukkan minimal satu bukti (Teks, Gambar, atau Audio)!")
             return
@@ -57,20 +50,22 @@ def show():
         with st.spinner('Sedang melakukan investigasi menyeluruh...'):
             results = []
             
-            # 1. Analisis Teks
             if input_text:
                 label, score = txt_handler.predict(input_text)
                 results.append({"type": "Teks", "label": label, "score": score})
             
-            # 2. Analisis Gambar
             if input_image:
-                # Kita pakai MobileNet sbg default biar cepat
-                label, score = img_handler.predict(input_image, "MobileNet")
-                results.append({"type": "Gambar", "label": label, "score": score})
+                original_label, score = img_handler.predict(input_image, "MobileNet")
+                hoax_labels = ['hoax', 'fake', 'fake/generated']
+                
+                if original_label.lower() in hoax_labels:
+                    flipped_label = "Valid"
+                else:
+                    flipped_label = "Hoax"
+                
+                results.append({"type": "Gambar", "label": flipped_label, "score": score})
 
-            # 3. Analisis Audio
             if input_audio and aud_handler:
-                # Simpan temp file karena handler audio butuh path file
                 temp_path = "temp_multi_audio.wav"
                 with open(temp_path, "wb") as f:
                     f.write(input_audio.getbuffer())
@@ -78,16 +73,13 @@ def show():
                 label, score = aud_handler.predict(temp_path)
                 results.append({"type": "Audio", "label": label, "score": score})
                 
-                # Bersihkan file temp
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
 
-            # --- TAMPILKAN KESIMPULAN ---
             st.subheader("Laporan Hasil Investigasi")
             
-            # Logika Kesimpulan: Cek jika ada SALAH SATU yang hoax
-            # Kita pakai .lower() biar aman (hoax/Hoax/HOAX dianggap sama)
-            any_hoax = any(r['label'].lower() in ['hoax', 'fake', 'fake/generated'] for r in results)
+            hoax_indicators = ['hoax', 'fake', 'fake/generated']
+            any_hoax = any(r['label'].lower() in hoax_indicators for r in results)
             
             if any_hoax:
                 st.error("### KESIMPULAN: INDIKASI HOAX / PALSU")
@@ -98,17 +90,14 @@ def show():
 
             st.divider()
             
-            # --- TAMPILKAN RINCIAN CARD ---
             r_col1, r_col2, r_col3 = st.columns(3)
             
             for i, res in enumerate(results):
-                # Pilih kolom secara dinamis (looping kolom 1, 2, 3)
                 target_col = [r_col1, r_col2, r_col3][i % 3]
                 
-                # Tentukan Warna Card
-                is_hoax = res['label'].lower() in ['hoax', 'fake', 'fake/generated']
-                status_color = "#dc3545" if is_hoax else "#28a745" # Merah / Hijau
-                bg_color = "#fff5f5" if is_hoax else "#f0fff4"     # Latar belakang tipis
+                is_hoax = res['label'].lower() in hoax_indicators
+                status_color = "#dc3545" if is_hoax else "#28a745"
+                bg_color = "#fff5f5" if is_hoax else "#f0fff4"
                 
                 with target_col:
                     target_col.markdown(f"""
